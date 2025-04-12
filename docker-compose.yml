@@ -1,0 +1,48 @@
+services:
+  postgres:
+    image: ankane/pgvector
+    container_name: pgvector-db
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypassword
+      POSTGRES_DB: docs
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U myuser -d docs"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init:/docker-entrypoint-initdb.d
+    networks:
+      - my-network
+
+  chatbot:
+    build:
+      context: .
+      args:
+        NPM_USER: ${NPM_USER}
+    container_name: ai-chatbot
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY} # From .env file
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./:/app
+      - /app/node_modules # Avoid host/node_modules conflict
+    networks:
+      - my-network
+
+volumes:
+  pgdata:
+
+networks:
+  my-network:
+    driver: bridge
